@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Tajawal", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Print Specific Isolation */
+@media print {
+  /* Hide every single element */
+  body * {
+    visibility: hidden;
+  }
+  /* Show only the CV area and its descendants */
+  #printable-cv-area, #printable-cv-area * {
+    visibility: visible;
+  }
+  #printable-cv-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  /* Set exact page spacing */
+  @page {
+    margin: 2.5cm !important;
+    size: A4;
+  }
+}
