@@ -1,0 +1,6 @@
+{
+  "name": "Wazaef - Jobs and Smart CV Portal",
+  "description": "A comprehensive job search portal, smart ATS CV builder with PDF templates, recruitment office directory, Telegram bot scheduler, and Gemini-powered Interview Simulator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
