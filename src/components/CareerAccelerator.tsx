@@ -30,7 +30,7 @@ export function CareerAccelerator({
   onToggleFocusMode,
   onNavigateTab,
   activeUserName = "أحمد محمد محمود جلال",
-  activeUserEmail = "demo@masar-app.com",
+  activeUserEmail = "demo@masar.dev",
   onLogout
 }: CareerAcceleratorProps) {
   const isRtl = language === "ar";
