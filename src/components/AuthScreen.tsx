@@ -17,19 +17,52 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language 
   const [err, setErr] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const handleRegisterDemoUser = async () => {
-    setErr("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/demo", { method: "POST" });
-      const data = await res.json();
-      if (data.success) onAuthSuccess(data.user);
-      else setErr(isRtl ? "فشل الدخول التجريبي." : "Demo login failed.");
-    } catch {
-      setErr(isRtl ? "فشل الاتصال بالخادم." : "Server connection failed.");
-    } finally {
-      setLoading(false);
-    }
+  const handleRegisterDemoUser = () => {
+    // Demo login works fully offline — no server needed
+    const demoUser = {
+      id: "demo-" + Date.now(),
+      email: "demo@masar.dev",
+      name: isRtl ? "مستخدم تجريبي" : "Demo User",
+      profile: {
+        personal: {
+          name: isRtl ? "أحمد محمد جلال" : "Ahmed Mohamed Galal",
+          title: isRtl ? "محاسب مالي أول" : "Senior Financial Accountant",
+          email: "demo@masar.dev",
+          phone: "+20 102 345 6789",
+          location: isRtl ? "القاهرة، مصر" : "Cairo, Egypt",
+          website: "",
+          summary: isRtl
+            ? "محاسب مالي خبرة ٥ سنوات في تمويل الشركات وإعداد القوائم الختامية والميزانيات العمومية."
+            : "Senior accountant with 5 years of experience in corporate finance and financial reporting."
+        },
+        skills: isRtl
+          ? ["التحليل المالي", "Odoo ERP", "Excel المتقدم", "محاسبة التكاليف", "التسوية الضريبية"]
+          : ["Financial Analysis", "Odoo ERP", "Advanced Excel", "Cost Accounting", "Tax Compliance"],
+        experience: [{
+          id: "exp-1",
+          company: isRtl ? "شركة النيل للتجارة والاستثمار" : "Nile Trade & Investment Group",
+          role: isRtl ? "محاسب مالي أول" : "Senior Financial Accountant",
+          duration: isRtl ? "2023 - الآن" : "2023 - Present",
+          description: isRtl
+            ? "إعداد القوائم المالية وتسوية الحسابات البنكية والتعامل مع الضرائب."
+            : "Prepared financial statements, bank reconciliations, and tax filings."
+        }],
+        education: [{
+          id: "edu-1",
+          institution: isRtl ? "جامعة عين شمس" : "Ain Shams University",
+          degree: isRtl ? "بكالوريوس محاسبة - جيد جداً" : "B.Sc. Accounting — Very Good",
+          duration: "2017 - 2021"
+        }],
+        languages: [
+          { id: "l1", name: isRtl ? "العربية" : "Arabic", level: isRtl ? "اللغة الأم" : "Native" },
+          { id: "l2", name: isRtl ? "الإنجليزية" : "English", level: isRtl ? "جيد جداً" : "Professional" }
+        ],
+        projects: [],
+        targetFields: [],
+        targetLocations: []
+      }
+    };
+    onAuthSuccess(demoUser);
   };
 
   const handleAuth = async (e: React.FormEvent) => {
