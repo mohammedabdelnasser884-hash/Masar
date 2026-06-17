@@ -11,7 +11,7 @@ export const translations = {
     navInfluencers: "رواد التوظيف",
     navBot: "لوحة تحكم البوت",
     navPitcher: "صانع رسائل التواصل الذكي",
-    navContract: "مستشار العقود وتجهيز السفر",
+    navContract: "فاحص عروض العمل وعقود السفر",
     navAccelerator: "لوحة المسرّع والتحكم المهني 🚀",
     colloquialTip: "جرب لهجة عامية: 'شغلانة جدة' ➡️ 'وظائف جدة'، 'مرتب محاسب قطر' ➡️ 'رواتب محاسبة قطر'",
     
@@ -68,7 +68,7 @@ export const translations = {
     atsKeywordsMissing: "الكلمات المفتاحية المفقودة بالـ CV والضرورية لتجاوز الفلتر:",
     atsFormatCritique: "ملاحظات حول تنسيق القالب والصياغة:",
     atsRec: "توجيهات مخصصة لترقية سيرتك الذاتية:",
-    atsSimulatedWarning: "*نتيجة تحليل الذكاء الاصطناعي.",
+    atsSimulatedWarning: "*هذه نتيجة تقدير محاكاة لعدم توفر مفتاح Gemini API بالبيئة.",
 
     // Interviews
     intHeader: "محاكي مراجعة المقابلات الشخصية الذكي",
@@ -169,9 +169,9 @@ export const translations = {
     templateAcademic: "Academic (Detailed research formats)",
     printCv: "Print / Export to PDF",
     copyPlain: "Copy CV Plaintext summary",
-    tailorWithAI: "Customize and Tailor with AI",
+    tailorWithAI: "Customize and Tailor with Gemini AI",
     tailorSelectJob: "Apply target job description context to customize your CV:",
-    tailorBtn: "Tailor CV with AI",
+    tailorBtn: "Tailor CV content with Gemini",
     summaryAIWarning: "This reorders your skills lists and formats your professional summary to comply!",
 
     // ATS Check
@@ -185,7 +185,7 @@ export const translations = {
     atsKeywordsMissing: "Lacking Keywords & Skills gaps needed to pass barriers:",
     atsFormatCritique: "Format, margins & architectural advice:",
     atsRec: "Bespoke optimization roadmap:",
-    atsSimulatedWarning: "*AI analysis result.",
+    atsSimulatedWarning: "*Mock results rendered. Specify process.env.GEMINI_API_KEY to activate live analyses.",
 
     // Interviews
     intHeader: "Conversational Interview Trainer",
