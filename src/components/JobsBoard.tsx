@@ -17,8 +17,6 @@ export const JobsBoard: React.FC<JobsBoardProps> = ({ onTailorTrigger, language,
   const [type, setType] = useState<"all" | "remote" | "onsite" | "hybrid">("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
 
   const searchJobs = async (customKeyword = keyword, customLocation = location) => {
     setLoading(true);
@@ -40,20 +38,6 @@ export const JobsBoard: React.FC<JobsBoardProps> = ({ onTailorTrigger, language,
       setError(isRtl ? "حدث خطأ أثناء جلب الوظائف. يرجى المحاولة لاحقاً." : "Could not retrieve jobs. Try again later.");
     } finally {
       setLoading(false);
-    }
-  };
-
-
-  const handleForceRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await fetch("/api/jobs/refresh", { method: "POST" });
-      setLastUpdated(new Date().toLocaleTimeString("ar-EG"));
-      await searchJobs("", "");
-    } catch (err) {
-      console.error("Refresh failed:", err);
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -183,21 +167,6 @@ export const JobsBoard: React.FC<JobsBoardProps> = ({ onTailorTrigger, language,
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>{isRtl ? "بحث" : "Search"}</span>}
             </button>
           </div>
-        </div>
-
-        {/* Refresh Bar */}
-        <div className="flex items-center justify-between pt-1">
-          <p className="text-[11px] text-slate-400">
-            {lastUpdated ? (isRtl ? `آخر تحديث: ${lastUpdated}` : `Last updated: ${lastUpdated}`) : (isRtl ? "وظائف حقيقية من Wuzzuf · Bayt · Remotive" : "Live jobs from Wuzzuf · Bayt · Remotive")}
-          </p>
-          <button
-            onClick={handleForceRefresh}
-            disabled={refreshing || loading}
-            className="flex items-center gap-1.5 text-[11px] text-indigo-600 font-bold hover:text-indigo-800 disabled:opacity-40 transition-all"
-          >
-            <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? (isRtl ? "جاري التحديث..." : "Refreshing...") : (isRtl ? "تحديث الوظائف" : "Refresh Jobs")}
-          </button>
         </div>
 
         {/* Colloquial Suggestion Panel */}
