@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { FileCheck, ShieldAlert, Award, Calculator, Info, CheckCircle2, Loader2, AlertTriangle, ArrowRight, DollarSign, AlertCircle } from "lucide-react";
+import { FileCheck, ShieldAlert, Award, Calculator, Info, CheckCircle2, Loader2, AlertTriangle, ArrowRight, DollarSign } from "lucide-react";
+import { getAuthHeaders } from "../App";
 
 interface ContractAdvisorProps {
   language: "ar" | "en";
@@ -22,19 +23,17 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
   // Loading and output
   const [loading, setLoading] = useState(false);
   const [auditResult, setAuditResult] = useState<any>(null);
-  const [errorMsg, setErrorMsg] = useState("");
 
   const handleAudit = async () => {
     if (!jobTitle || !salary) {
-      setErrorMsg(isRtl ? "يرجى إدخال المسمى الوظيفي والراتب المعروض." : "Please enter the job title and salary offer.");
+      alert(isRtl ? "يرجى إدخال المسمى الوظيفي والراتب المعروض." : "Please enter the job title and salary offer.");
       return;
     }
-    setErrorMsg("");
     setLoading(true);
     try {
       const res = await fetch("/api/ai/contract-audit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({
           jobTitle,
           salary,
@@ -52,10 +51,11 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
       if (data.success) {
         setAuditResult(data);
       } else {
-        setErrorMsg(isRtl ? "تعذر الاتصال بمدقق العقود." : "Failed to generate contract audit scorecard.");
+        alert(isRtl ? "تعذر الاتصال بمدقق العقود." : "Failed to generate contract audit scorecard.");
       }
     } catch (err) {
-      setErrorMsg(isRtl ? "حدث خطأ غير متوقع، حاول مرة أخرى." : "An unexpected error occurred. Please retry.");
+      console.error(err);
+      alert(isRtl ? "حدث خطأ غير متوقع." : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -89,14 +89,6 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
             </p>
           </div>
         </div>
-
-        {/* Error Message */}
-        {errorMsg && (
-          <div className="mb-4 bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl flex items-center gap-2 text-xs font-semibold">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
 
         {/* INPUT LAYOUT */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -196,7 +188,7 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
             <button
               onClick={handleAudit}
               disabled={loading}
-              className="masar-btn masar-btn-dark w-full py-3"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
             >
               {loading ? (
                 <>
@@ -218,7 +210,7 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
               <div className="space-y-6">
                 
                 {/* 1. Score Rating Callout */}
-                <div className="rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 masar-hero-gradient text-white">
+                <div className="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">
                       {isRtl ? "مؤشر عدالة وموثوقية العرض" : "Offer Financial Justice Indicator"}
@@ -237,7 +229,7 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
                 </div>
 
                 {/* 2. Red Flags & Pitfalls Warning Box */}
-                <div className="masar-card p-5" style={{background:"#fffbeb",borderColor:"rgba(245,158,11,0.2)"}}>
+                <div className="bg-amber-50/60 border border-amber-200/80 p-5 rounded-2xl">
                   <div className="flex items-center gap-2 text-amber-700 font-extrabold text-xs mb-3">
                     <ShieldAlert className="w-4.5 h-4.5" />
                     <span>{isRtl ? "🛑 ثغرات قانونية وتنبيهات هامة للمساءلة:" : "🛑 Crucial Contract Nuances & Red Flags:"}</span>
@@ -266,7 +258,7 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                     {auditResult.checklists && auditResult.checklists.map((step: string, idx: number) => (
-                      <div key={idx} className="masar-card p-3 flex items-start gap-2.5">
+                      <div key={idx} className="bg-white border p-3 rounded-xl flex items-start gap-2.5">
                         <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 flex-shrink-0 mt-0.5" />
                         <div>
                           <span className="text-[11px] font-black text-slate-400 block font-mono">STEP 0{idx+1}</span>
@@ -278,7 +270,13 @@ export function ContractAdvisor({ language }: ContractAdvisorProps) {
                 </div>
 
                 {/* Dummy/Simplay warning */}
-
+                {auditResult.simulated && (
+                  <div className="text-center py-2 bg-slate-100 text-[10px] text-slate-500 rounded-lg">
+                    {isRtl
+                      ? "* هذه الحسابات والتقديرات مأخوذة بناءً على أسعار المعيشة بالخليج توازناً لعام 2026. ضع مفتاح الـ API للتفعيل الكامل لـ Gemini."
+                      : "* Standard parameters loaded. Add process.env.GEMINI_API_KEY to fetch bespoke living calculators."}
+                  </div>
+                )}
 
               </div>
             ) : (
