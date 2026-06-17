@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Building2, Phone, MapPin, Star, Plus, AlertCircle, Loader2, Globe, Facebook, Send } from "lucide-react";
+import { Building2, Phone, MapPin, Star, Plus, AlertCircle, Loader2, Globe, Facebook, Send, Mail, MessageCircle } from "lucide-react";
 import { Agency } from "../types";
+import { getAuthHeaders } from "../App";
 
 interface AgenciesRegistryProps {
   language: "ar" | "en";
@@ -23,6 +24,8 @@ export const AgenciesRegistry: React.FC<AgenciesRegistryProps> = ({ language, t 
   const [newFacebook, setNewFacebook] = useState("");
   const [newTelegram, setNewTelegram] = useState("");
   const [newWebsite, setNewWebsite] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newWhatsapp, setNewWhatsapp] = useState("");
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
 
@@ -64,7 +67,7 @@ export const AgenciesRegistry: React.FC<AgenciesRegistryProps> = ({ language, t 
     try {
       const res = await fetch("/api/agencies", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({
           name: newName,
           phone: newPhone,
@@ -72,7 +75,9 @@ export const AgenciesRegistry: React.FC<AgenciesRegistryProps> = ({ language, t 
           description: newDesc,
           facebook: newFacebook,
           telegram: newTelegram,
-          website: newWebsite
+          website: newWebsite,
+          email: newEmail,
+          whatsapp: newWhatsapp
         })
       });
       const data = await res.json();
@@ -85,6 +90,8 @@ export const AgenciesRegistry: React.FC<AgenciesRegistryProps> = ({ language, t 
         setNewFacebook("");
         setNewTelegram("");
         setNewWebsite("");
+        setNewEmail("");
+        setNewWhatsapp("");
         fetchAgencies();
         setTimeout(() => setShowAddForm(false), 1500);
       } else {
@@ -105,7 +112,7 @@ export const AgenciesRegistry: React.FC<AgenciesRegistryProps> = ({ language, t 
     try {
       const res = await fetch(`/api/agencies/${agencyId}/review`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({
           userName: revUser,
           rating: revRating,
@@ -263,6 +270,30 @@ export const AgenciesRegistry: React.FC<AgenciesRegistryProps> = ({ language, t 
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">{isRtl ? "البريد الإلكتروني للتقديم (اختياري)" : "Recruitment Email (Optional)"}</label>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="cv@agency.com"
+                className="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs outline-none focus:border-indigo-500 font-sans"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-700">{isRtl ? "رابط واتساب مباشر (اختياري)" : "WhatsApp Direct Link (Optional)"}</label>
+              <input
+                type="text"
+                value={newWhatsapp}
+                onChange={(e) => setNewWhatsapp(e.target.value)}
+                placeholder="https://wa.me/20100000000"
+                className="w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs outline-none focus:border-indigo-500 font-sans"
+              />
+            </div>
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -336,16 +367,55 @@ export const AgenciesRegistry: React.FC<AgenciesRegistryProps> = ({ language, t 
                   <p className="text-xs text-slate-600 leading-relaxed leading-[1.6]">{agency.description}</p>
 
                 {/* Contacts details */}
-                <div className="space-y-1 text-slate-500 font-sans text-xs pt-2">
+                <div className="space-y-1.5 text-slate-500 font-sans text-xs pt-2">
                   <div className="flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5 text-slate-400" />
                     <span>{agency.phone}</span>
                   </div>
+                  {agency.email && (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <Mail className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="break-all">{agency.email}</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5 pt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
                     <span>{agency.address}</span>
                   </div>
                 </div>
+
+                {/* Direct Action Contact Channels */}
+                {(agency.whatsapp || agency.email) && (
+                  <div className="flex gap-2 pt-2 pb-1">
+                    {agency.whatsapp && (
+                      <a
+                        href={agency.whatsapp}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-700 font-bold rounded-xl text-[11px] transition duration-200 select-none cursor-pointer"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>{isRtl ? "واتساب مباشر" : "WhatsApp"}</span>
+                      </a>
+                    )}
+                    
+                    {agency.email && (
+                      <a
+                        href={`mailto:${agency.email}?subject=${encodeURIComponent(
+                          isRtl ? "تقديم طلب توظيف وسيرة ذاتية عبر بوابة مسار" : "Job Application & Resume - Masar Portal"
+                        )}&body=${encodeURIComponent(
+                          isRtl
+                            ? "السلام عليكم ورحمة الله وبركاته،\nأود التقديم لوظائف ملائمة لتخصصي وتجهيز المقابلات المباشرة عبر مكتبكم الموقر. مرفق لكم سيرتي الذاتية ومؤهلاتي بفارغ الصبر."
+                            : "Hello,\nI would like to apply for recruitment vacancies matching my profile and coordinate direct interviews through your agency. Please find attached my CV & credentials."
+                        )}`}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 font-bold rounded-xl text-[11px] transition duration-200 select-none cursor-pointer"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                        <span>{isRtl ? "مراسلة بالإيميل" : "Send Email"}</span>
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {/* Social links / entry channels */}
                 {(agency.facebook || agency.telegram || agency.website) && (
