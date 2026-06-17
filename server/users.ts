@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { getStoredJobs } from "./jobSource.js";
+import { GoogleGenAI } from "@google/genai";
+import bcrypt from "bcrypt";
 
 const FILE_PATH = path.join(process.cwd(), "data", "users.json");
 
@@ -111,7 +113,7 @@ export function registerUser(email: string, passwordHash: string, name: string) 
   const newUser: User = {
     id: `user-${Date.now()}`,
     email: normalizedEmail,
-    passwordHash: passwordHash, // for preview/applet simple plaintext or standard hash is robust
+    passwordHash: bcrypt.hashSync(passwordHash, 10),
     createdAt: new Date().toISOString(),
     profile: defaultProfile
   };
@@ -127,8 +129,8 @@ export function loginUser(email: string, passwordHash: string) {
   const users = readUsersDb();
   const normalizedEmail = email.toLowerCase().trim();
 
-  const user = users.find(u => u.email.toLowerCase() === normalizedEmail && u.passwordHash === passwordHash);
-  if (!user) {
+  const user = users.find(u => u.email.toLowerCase() === normalizedEmail);
+  if (!user || !bcrypt.compareSync(passwordHash, user.passwordHash)) {
     return { success: false, message: "البريد الإلكتروني أو كلمة المرور غير صحيحة!" };
   }
 
@@ -165,7 +167,7 @@ export function updateProfile(email: string, profile: UserProfile) {
 }
 
 // 5. MATCHED JOBS COMPILER & REPORT ENGINE
-export async function getMatchedJobs(email: string) {
+export async function getMatchedJobs(email: string, geminiKey?: string) {
   const users = readUsersDb();
   const normalizedEmail = email.toLowerCase().trim();
 
@@ -233,6 +235,35 @@ export async function getMatchedJobs(email: string) {
   // Generate dynamic Arabic summary report
   let dailyReport = "";
   
+  if (geminiKey && geminiKey !== "MY_GEMINI_API_KEY" && geminiKey.trim() !== "") {
+    try {
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const prompt = `أنت خبير توظيف ذكي لمنصة "مسار" لتوظيف المصريين والخليج.
+يرجى كتابة تقرير مطابقة يومي مخصص وصغير ومبهر باللغة العربية بناءً على ملف المستخدم والمطابقات المكتشفة اليوم.
+
+بيانات المستخدم المهنية:
+الاسم: ${profile.personal.name}
+المسمى المستهدف: ${profile.personal.title}
+الملخص المهني: ${profile.personal.summary}
+المهارات المضافة: ${profile.skills.join("، ")}
+المجالات المستهدفة: ${profile.targetFields.join("، ")}
+الأماكن المفضلة: ${profile.targetLocations.join("، ")}
+
+عدد الفرص المتطابقة المكتشفة اليوم: ${topMatches.length} فرصة.
+أهم الفرص:
+${topMatches.map(m => `- ${m.title} لدى ${m.company} بـ ${m.location} (نسبة مطابقة ${m.matchScore}%)`).join("\n")}
+
+المطلوب: كتابة تقرير ملخص إيجابي وداعم (بين 120 إلى 150 كلمة باللغة العربية بأسلوب منسق ونقاط واضحة) ينصح المستخدم بخطوات دقيقة للتقديم على أفضل الفرص المتاحة وتعديل سيرته الذاتية بالاتساق معها. لا تكتب أكواد جيسون، اكتب نص التقرير مباشرة بطريقة عرض أنيقة.`;
+
+      const res = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: prompt
+      });
+      dailyReport = res.text || "";
+    } catch (e) {
+      console.error("Failed to generate AI report, using system generator", e);
+    }
+  }
 
   // Backup system report generator (if no key or AI failed)
   if (!dailyReport) {
