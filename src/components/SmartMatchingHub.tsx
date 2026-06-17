@@ -53,7 +53,12 @@ export const SmartMatchingHub: React.FC<SmartMatchingHubProps> = ({
     if (!silent) setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/jobs/matched?email=${encodeURIComponent(email)}`);
+      const token = localStorage.getItem("masar_token");
+      const res = await fetch("/api/jobs/matched", {
+        headers: {
+          "Authorization": `Bearer ${token || ""}`
+        }
+      });
       const data = await res.json();
       if (data.success) {
         setJobs(data.matches || []);
@@ -71,43 +76,18 @@ export const SmartMatchingHub: React.FC<SmartMatchingHubProps> = ({
   const runLiveCrawlSimulation = async () => {
     setIsCrawling(true);
     setCrawlerLogs([]);
-    
-    const logs = isRtl ? [
-      "🤖 بدء تشغيل وحدة الزحف الذكية الموحدة لمنصة 'مسار'...",
-      "⚙️ قراءة مخرجات مهارات المستخدم من الملف الشخصي والـ CV...",
-      `📍 تحديد النطاق الجغرافي المستهدف: [${selectedLocations.join(" - ")}]`,
-      "🌐 تهيئة الاتصال بمحرك فك شفرات مواقع التواصل والجروبات...",
-      "🔗 جاري فحص منشورات فيسبوك النشطة لأهم الشركاء لفرص تنافسية عالية...",
-      "👥 سحب المشاركات اللحظية من صفحات: شركة الطائف، المعالي، إنفراد، آل زيدان، مسار...",
-      "📌 رصد إعلانات تراست جروب، جوب واي الطبي، ومسار التوظيف واستدامة وهورايزون...",
-      "💬 تصفية وفرز قنوات تليجرام الموثقة وبكجات الوظائف الحكومية والخاصة...",
-      "💼 استدعاء وحقن الـ LinkedIn Job Finder API والتقاط وظائف الشركات الكبرى...",
-      "🔍 سحق وتوطين منشورات الويب المغلقة واستخراج الروابط وصاحب العمل...",
-      "⚡ ترحيل 120 فرصة جديدة لوحدة مطابقة الذكاء الاصطناعي السمانتية لربطها بمهاراتك...",
-      "📊 فرز وتقييم مئات نقاط التطابق لإيجاد الأفضل توافقاً مع ملفك الشخصي...",
-      "✅ تم توليد تقرير الذكاء الاصطناعي اليومي وجذب أفضل الفرص المتطابقة بنجاح!"
-    ] : [
-      "🤖 Spawning Masar Autonomous Crawl Worker Unit...",
-      "⚙️ Indexing user profile skills tags and career dossier...",
-      `📍 Constraints set: geographical scope [${selectedLocations.join(" - ")}]`,
-      "🌐 Opening secure socket streams for closed social feeds...",
-      "🔗 Parsing live Facebook status posts from accredited recruiters...",
-      "👥 Scraping pages: Taif Recruiting, Al Maaly Group, Enfrad, Al Zaidan, Masar...",
-      "📌 Indexing announcements from Trust Group, JobWey Medical, Estidama, Horizon...",
-      "💬 Parsing accredited Telegram jobs feeds & broadcast archives...",
-      "💼 Extracting remote nodes from LinkedIn & Google Search indexers...",
-      "🔍 Standardizing data tables, cleaning outdated URLs, filtering fake adverts...",
-      "⚡ Analyzing matches with AI semantic engine...",
-      "📊 Pruning and scoring overlapping metadata to find matching positions...",
-      "✅ Process completed! Syncing top recommended selections on your board."
-    ];
 
-    for (let i = 0; i < logs.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, i === 0 ? 300 : i === 4 ? 600 : i === 7 ? 600 : 350));
-      setCrawlerLogs((prev) => [...prev, logs[i]]);
-    }
+    const log = (msg: string) => setCrawlerLogs(prev => [...prev, msg]);
+
+    log(isRtl ? "🔍 جاري البحث في قاعدة بيانات مسار..." : "🔍 Searching Masar jobs database...");
+    log(isRtl
+      ? `📍 النطاق الجغرافي: ${selectedLocations.length > 0 ? selectedLocations.join(" - ") : "كل المناطق"}`
+      : `📍 Scope: ${selectedLocations.length > 0 ? selectedLocations.join(" - ") : "All regions"}`
+    );
 
     await loadMatches(true);
+
+    log(isRtl ? "✅ تم جلب أفضل الوظائف المطابقة لملفك الشخصي" : "✅ Matched jobs loaded from your profile");
     setIsCrawling(false);
   };
 
@@ -138,13 +118,13 @@ export const SmartMatchingHub: React.FC<SmartMatchingHubProps> = ({
           <div className="space-y-2">
             <span className="inline-flex items-center gap-1.5 bg-indigo-500/10 text-indigo-200 border border-indigo-500/30 px-3 py-1 rounded-xl text-xs font-bold leading-none">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-              {isRtl ? "محرك زواحف تصفية وتجميع الويب اليومي" : "Active Crawler Platform"}
+              {isRtl ? "نظام البحث السمانتي والمطابقة المهنية" : "Active Match & Alignment Engine"}
             </span>
-            <h2 className="text-xl md:text-2xl font-black tracking-tight">{isRtl ? "لوحة تصفية وسحب الوظائف التلقائية" : "Autonomous Intelligent Job Extractor"}</h2>
+            <h2 className="text-xl md:text-2xl font-black tracking-tight">{isRtl ? "مطابقة الفرص الذكية وتخطيط مسار" : "Intelligent Job Alignment Engine"}</h2>
             <p className="text-xs text-indigo-100/80 max-w-2xl leading-relaxed">
               {isRtl
-                ? "شغّل نظام الزواحف الموقتة لمسح وتجميع إعلانات التوظيف من صفحات سفريات فيسبوك، تليجرام، وتطبيق فلاتر الـ AI لمطابقتها مع مهاراتك بشكل متكامل."
-                : "A unified system mapping closed channels, closed Telegram repositories, Google custom crawler indices, and Facebook updates daily."}
+                ? "قاطع مهارات وسيرتك الذاتية مع قاعدة بيانات مسار التي تحتوي على مئات شواغر من الشركات المعتمدة والموثقة، ليمدك الذكاء الاصطناعي بتقرير توافق كامل."
+                : "Match your core skills and CV to hundreds of active contracts and corporate vacancies from accredited employers inside Masar's database."}
             </p>
           </div>
           
@@ -154,57 +134,24 @@ export const SmartMatchingHub: React.FC<SmartMatchingHubProps> = ({
             className="text-xs bg-indigo-500 hover:bg-indigo-400 text-white font-extrabold px-5 py-3 rounded-xl transition duration-200 flex items-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shadow-lg shadow-indigo-500/20 mr-auto"
           >
             <Play className={`w-3.5 h-3.5 fill-current ${isCrawling ? "animate-spin" : ""}`} />
-            <span>{isRtl ? "أطلق معالج الزحف الفوري ⚡" : "Initiate Web Crawl Now ⚡"}</span>
+            <span>{isRtl ? "أطلق معالج الفحص والمطابقة ⚡" : "Initiate Alignment Process ⚡"}</span>
           </button>
         </div>
 
-        {/* Channels Monitor Configurations Grid */}
+        {/* Search Configuration Grid */}
         <div className="border-t border-white/10 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Active Target Nodes */}
+          {/* Source Info */}
           <div className="space-y-2.5">
             <span className="text-[10px] uppercase font-black tracking-wider text-indigo-200 block">
-              {isRtl ? "قنوات السحب والتنقيب النشطة" : "Crawl Target Nodes Pipeline"}
+              {isRtl ? "مصادر البحث" : "Search Sources"}
             </span>
             <div className="flex flex-wrap gap-1.5">
-              <label className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl text-[10.5px] cursor-pointer hover:bg-white/10 transition">
-                <input
-                  type="checkbox"
-                  checked={crawlerActiveSources.facebook}
-                  onChange={(e) => setCrawlerActiveSources({ ...crawlerActiveSources, facebook: e.target.checked })}
-                  className="rounded border-none accent-indigo-600 w-3.5 h-3.5"
-                />
-                <span>{isRtl ? "منشورات فيسبوك (مجموعات مغلقة)" : "Facebook Groups"}</span>
-              </label>
-              
-              <label className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl text-[10.5px] cursor-pointer hover:bg-white/10 transition">
-                <input
-                  type="checkbox"
-                  checked={crawlerActiveSources.telegram}
-                  onChange={(e) => setCrawlerActiveSources({ ...crawlerActiveSources, telegram: e.target.checked })}
-                  className="rounded border-none accent-indigo-600 w-3.5 h-3.5"
-                />
-                <span>{isRtl ? "قنوات تليجرام الموثقة" : "Telegram Channels"}</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl text-[10.5px] cursor-pointer hover:bg-white/10 transition">
-                <input
-                  type="checkbox"
-                  checked={crawlerActiveSources.linkedin}
-                  onChange={(e) => setCrawlerActiveSources({ ...crawlerActiveSources, linkedin: e.target.checked })}
-                  className="rounded border-none accent-indigo-600 w-3.5 h-3.5"
-                />
-                <span>LinkedIn Index APIS</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl text-[10.5px] cursor-pointer hover:bg-white/10 transition">
-                <input
-                  type="checkbox"
-                  checked={crawlerActiveSources.google}
-                  onChange={(e) => setCrawlerActiveSources({ ...crawlerActiveSources, google: e.target.checked })}
-                  className="rounded border-none accent-indigo-600 w-3.5 h-3.5"
-                />
-                <span>Google Crawling Indices</span>
-              </label>
+              <span className="flex items-center gap-1.5 bg-indigo-600/20 border border-indigo-500/30 px-2.5 py-1.5 rounded-xl text-[10.5px] text-indigo-200 font-medium">
+                ✓ {isRtl ? "قاعدة بيانات مسار" : "Masar Jobs Database"}
+              </span>
+              <span className="flex items-center gap-1.5 bg-indigo-600/20 border border-indigo-500/30 px-2.5 py-1.5 rounded-xl text-[10.5px] text-indigo-200 font-medium">
+                ✓ {isRtl ? "وكالات التوظيف المسجلة" : "Registered Agencies"}
+              </span>
             </div>
           </div>
 
