@@ -1,0 +1,16 @@
+{
+  "name": "مسار المهنية",
+  "short_name": "مسار",
+  "description": "بوابتك للتوظيف الذكي في العالم العربي",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fc",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "categories": ["productivity", "business", "utilities"]
+}
