@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { LogIn, UserPlus, Mail, Lock, User, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
+import { Logo } from "./Logo";
 
 interface AuthScreenProps {
   onAuthSuccess: (user: { email: string; name: string; id: string; profile: any }) => void;
@@ -18,51 +19,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language 
   const [successMsg, setSuccessMsg] = useState("");
 
   const handleRegisterDemoUser = () => {
-    // Demo login works fully offline — no server needed
-    const demoUser = {
-      id: "demo-" + Date.now(),
-      email: "demo@masar.dev",
-      name: isRtl ? "مستخدم تجريبي" : "Demo User",
-      profile: {
-        personal: {
-          name: isRtl ? "أحمد محمد جلال" : "Ahmed Mohamed Galal",
-          title: isRtl ? "محاسب مالي أول" : "Senior Financial Accountant",
-          email: "demo@masar.dev",
-          phone: "+20 102 345 6789",
-          location: isRtl ? "القاهرة، مصر" : "Cairo, Egypt",
-          website: "",
-          summary: isRtl
-            ? "محاسب مالي خبرة ٥ سنوات في تمويل الشركات وإعداد القوائم الختامية والميزانيات العمومية."
-            : "Senior accountant with 5 years of experience in corporate finance and financial reporting."
-        },
-        skills: isRtl
-          ? ["التحليل المالي", "Odoo ERP", "Excel المتقدم", "محاسبة التكاليف", "التسوية الضريبية"]
-          : ["Financial Analysis", "Odoo ERP", "Advanced Excel", "Cost Accounting", "Tax Compliance"],
-        experience: [{
-          id: "exp-1",
-          company: isRtl ? "شركة النيل للتجارة والاستثمار" : "Nile Trade & Investment Group",
-          role: isRtl ? "محاسب مالي أول" : "Senior Financial Accountant",
-          duration: isRtl ? "2023 - الآن" : "2023 - Present",
-          description: isRtl
-            ? "إعداد القوائم المالية وتسوية الحسابات البنكية والتعامل مع الضرائب."
-            : "Prepared financial statements, bank reconciliations, and tax filings."
-        }],
-        education: [{
-          id: "edu-1",
-          institution: isRtl ? "جامعة عين شمس" : "Ain Shams University",
-          degree: isRtl ? "بكالوريوس محاسبة - جيد جداً" : "B.Sc. Accounting — Very Good",
-          duration: "2017 - 2021"
-        }],
-        languages: [
-          { id: "l1", name: isRtl ? "العربية" : "Arabic", level: isRtl ? "اللغة الأم" : "Native" },
-          { id: "l2", name: isRtl ? "الإنجليزية" : "English", level: isRtl ? "جيد جداً" : "Professional" }
-        ],
-        projects: [],
-        targetFields: [],
-        targetLocations: []
-      }
-    };
-    onAuthSuccess(demoUser);
+    // Convenience helper to quickly log in with the default demo account
+    setEmail("demo@masar-app.com");
+    setPassword("demo1234");
+    setActiveTab("login");
+    setErr("");
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -88,6 +49,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language 
       const data = await res.json();
 
       if (data.success) {
+        if (data.token) {
+          localStorage.setItem("masar_token", data.token);
+        }
         setSuccessMsg(
           activeTab === "login"
             ? (isRtl ? "تم تسجيل الدخول بنجاح! جاري تحويلك..." : "Signed in successfully! Redirecting...")
@@ -114,16 +78,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language 
         <div className="absolute -bottom-16 -right-16 w-32 h-32 bg-emerald-50 rounded-full blur-2xl opacity-60 pointer-events-none"></div>
 
         {/* Mascot / Title block */}
-        <div className="text-center space-y-2 relative">
-          <div className="inline-flex p-3 bg-slate-900 rounded-2xl text-white shadow-md mx-auto">
-            <Sparkles className="w-6 h-6 text-indigo-400" />
-          </div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">
-            {isRtl ? "بوابة التوطين والتوظيف الذكي" : "Smart Recruitment Gateway"}
-          </h2>
-          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+        <div className="text-center space-y-4 relative">
+          <Logo size="lg" variant="full" language={language} className="mx-auto select-none justify-center" />
+          <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
             {isRtl
-              ? "سجل ملفك الاحترافي بنظام مساد ودع محرك السحب اليومي يربطك بأحدث المقابلات والفرص المناسبة فورياً"
+              ? "سجل ملفك الاحترافي بنظام مسار ودع محرك السحب وحقن الـ AI يربطك بأحدث المقابلات والفرص فورياً"
               : "Register your professional profile to let our daily crawler match you directly to top vacancies."}
           </p>
         </div>
@@ -255,9 +214,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, language 
           </p>
           <button
             onClick={handleRegisterDemoUser}
-            className="masar-btn masar-btn-ghost w-full text-xs py-2.5"
+            className="text-xs text-indigo-600 font-extrabold hover:text-indigo-800 hover:underline cursor-pointer"
           >
-            {isRtl ? "🚀 دخول تجريبي سريع — بدون تسجيل" : "🚀 Quick Demo — No Registration Needed"}
+            {isRtl ? "🔑 تسجيل دخول تلقائي بالحساب التجريبي (demo@masar-app.com)" : "🔑 Autologin with demo@masar-app.com"}
           </button>
         </div>
       </div>
