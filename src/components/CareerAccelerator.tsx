@@ -9,6 +9,7 @@ import {
   MapPin, Settings, RefreshCw, Loader2
 } from "lucide-react";
 import { CVData } from "../types";
+import { getAuthHeaders } from "../App";
 
 interface CareerAcceleratorProps {
   cvData: CVData;
@@ -30,7 +31,7 @@ export function CareerAccelerator({
   onToggleFocusMode,
   onNavigateTab,
   activeUserName = "أحمد محمد محمود جلال",
-  activeUserEmail = "demo@masar.dev",
+  activeUserEmail = "demo@masar-app.com",
   onLogout
 }: CareerAcceleratorProps) {
   const isRtl = language === "ar";
@@ -66,7 +67,7 @@ export function CareerAccelerator({
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({
           message: userMsg,
           history: coachMessages.map(m => ({ role: m.sender === "user" ? "user" : "model", parts: [{ text: m.text }] }))
