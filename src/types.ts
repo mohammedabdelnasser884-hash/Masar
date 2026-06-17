@@ -84,8 +84,6 @@ export interface Agency {
   telegram?: string;
   website?: string;
   trustedByOwner?: boolean;
-  email?: string;
-  whatsapp?: string;
 }
 
 export interface InfluencerPost {
