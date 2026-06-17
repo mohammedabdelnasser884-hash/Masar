@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Briefcase, GraduationCap, Sparkles, Plus, Trash2, Save, FileCheck, ArrowLeftRight, Check, Loader2, Upload, X, File } from "lucide-react";
-import { getAuthHeaders } from "../App";
+import { User, Briefcase, GraduationCap, Sparkles, Plus, Trash2, Save, FileCheck, ArrowLeftRight, Check, Loader2 } from "lucide-react";
 import { UserProfile as UserProfileType } from "../../server/users";
 
 interface UserProfileProps {
@@ -42,52 +41,19 @@ export const UserProfile: React.FC<UserProfileProps> = ({
 
   // AI Resume Parser States
   const [cvTextToParse, setCvTextToParse] = useState("");
-  const [cvPdfToParse, setCvPdfToParse] = useState("");
-  const [pdfNameToParse, setPdfNameToParse] = useState("");
   const [parsing, setParsing] = useState(false);
   const [isParserOpen, setIsParserOpen] = useState(false);
-  const [activeParserTab, setActiveParserTab] = useState<"pdf" | "text">("pdf");
-
-  const handleParserPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.type !== "application/pdf") {
-      setError(isRtl ? "يرجى رفع ملف بصيغة PDF فقط لضمان سلامة الفحص الدقيق." : "Please upload a valid PDF file only.");
-      return;
-    }
-    setError("");
-    setPdfNameToParse(file.name);
-    
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arrayBuffer = reader.result as ArrayBuffer;
-      const blob = new Uint8Array(arrayBuffer);
-      let binary = "";
-      const len = blob.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(blob[i]);
-      }
-      const base64 = btoa(binary);
-      setCvPdfToParse(base64);
-    };
-    reader.readAsArrayBuffer(file);
-  };
 
   const handleParseCV = async () => {
-    const hasInput = activeParserTab === "pdf" ? !!cvPdfToParse : !!cvTextToParse.trim();
-    if (!hasInput || parsing) return;
+    if (!cvTextToParse.trim() || parsing) return;
     setParsing(true);
     setError("");
     setSuccess("");
     try {
-      const payload = activeParserTab === "pdf"
-        ? { cvPdf: cvPdfToParse }
-        : { cvText: cvTextToParse };
-
       const res = await fetch("/api/profile/parse", {
         method: "POST",
-        headers: getAuthHeaders(true),
-        body: JSON.stringify(payload)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cvText: cvTextToParse })
       });
       const data = await res.json();
       if (data.success && data.profile) {
@@ -100,8 +66,6 @@ export const UserProfile: React.FC<UserProfileProps> = ({
           : "Your CV has been parsed successfully! All columns populated automatically. Please review and click 'Save Changes' below."
         );
         setCvTextToParse("");
-        setCvPdfToParse("");
-        setPdfNameToParse("");
         setIsParserOpen(false);
       } else {
         setError(data.message || (isRtl ? "لم نتمكن من تحليل واستخلاص البيانات، يرجى المحاولة بنص آخر." : "Failed to extract structured resume coordinates."));
@@ -128,12 +92,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("masar_token");
-      const res = await fetch("/api/profile", {
-        headers: {
-          "Authorization": `Bearer ${token || ""}`
-        }
-      });
+      const res = await fetch(`/api/profile?email=${encodeURIComponent(email)}`);
       const data = await res.json();
       if (data.success && data.profile) {
         setProfile(data.profile);
@@ -174,8 +133,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     try {
       const res = await fetch("/api/profile", {
         method: "POST",
-        headers: getAuthHeaders(true),
-        body: JSON.stringify({ profile: updatedProfile })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, profile: updatedProfile })
       });
       const data = await res.json();
       if (data.success) {
@@ -330,8 +289,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
               </h3>
               <p className="text-[11px] text-slate-500 font-sans leading-relaxed">
                 {isRtl 
-                  ? "قم برفع ملف سيرتك الذاتية بصيغة (PDF) أو الصق نص السيرة ليقوم نظام الـ AI بكبسلة ملخصك، وخبراتك، ومهاراتك في ملفك الشخصي دفعة واحدة." 
-                  : "Upload your PDF resume or paste its plain text. Our AI extracts personal info, dates, skills, and histories to build your profile easily."}
+                  ? "انسخ وصق نص سيرتك الذاتية الحالية هنا ليتولى نظام الـ AI تعبئة وتحديث كافة بيانات ملفك الشخصي وسيرتك الذاتية خلال ثوانٍ معدودة." 
+                  : "Paste any raw resume text below. Our AI extracts personal info, dates, skills, and histories to build your digital dossier easily."}
               </p>
             </div>
           </div>
@@ -344,76 +303,20 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         </div>
 
         {isParserOpen && (
-          <div className="pt-3 border-t border-indigo-100/50 space-y-4">
-            <div className="flex gap-2 border-b pb-2 border-slate-100">
-              <button
-                type="button"
-                onClick={() => setActiveParserTab("pdf")}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${activeParserTab === "pdf" ? "bg-indigo-100 text-indigo-700" : "text-slate-600 bg-slate-50 hover:bg-slate-100"}`}
-              >
-                📁 {isRtl ? "رفع ملف سيرة ذاتية PDF" : "Upload PDF Resume"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveParserTab("text")}
-                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition ${activeParserTab === "text" ? "bg-indigo-100 text-indigo-700" : "text-slate-600 bg-slate-50 hover:bg-slate-100"}`}
-              >
-                ✍️ {isRtl ? "لصق نصي مباشر" : "Paste Plain Text"}
-              </button>
-            </div>
-
-            {activeParserTab === "pdf" ? (
-              <div className="space-y-3">
-                {!cvPdfToParse ? (
-                  <div className="border-2 border-dashed border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-slate-50 p-6 rounded-2xl flex flex-col items-center justify-center transition relative cursor-pointer">
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      onChange={handleParserPdfUpload}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <Upload className="w-6 h-6 text-indigo-500 mb-2" />
-                    <span className="text-xs font-extrabold text-slate-750 text-center">
-                      {isRtl ? "اضغط لرفع أو اسحب سيرة (PDF) إلى هنا" : "Click or drag your PDF resume here"}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="bg-emerald-600 text-white p-2 rounded-lg">
-                        <File className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-800 truncate max-w-[250px]" title={pdfNameToParse}>{pdfNameToParse}</p>
-                        <p className="text-[10px] text-emerald-600 font-bold">{isRtl ? "ملف جاهز للحقن وتفريغ البيانات" : "PDF ready for parsing"}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setCvPdfToParse(""); setPdfNameToParse(""); }}
-                      className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <textarea
-                rows={5}
-                value={cvTextToParse}
-                onChange={(e) => setCvTextToParse(e.target.value)}
-                placeholder={isRtl 
-                  ? "الصق تفاصيل سيرتك الذاتية هنا (مثال: الاسم، البريد، الخبرات السابقة مع الفترات الزمنية والجامعة...)" 
-                  : "Paste your raw text (e.g. John Doe, Web Developer at Tech Inc (2021-2023), BS Computer Science...)"}
-                className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs outline-none focus:border-indigo-500 focus:bg-white transition text-slate-800 font-sans leading-relaxed"
-              />
-            )}
-
-            <div className="flex justify-end gap-2 pt-1">
+          <div className="pt-3 border-t border-indigo-100/50 space-y-3">
+            <textarea
+              rows={5}
+              value={cvTextToParse}
+              onChange={(e) => setCvTextToParse(e.target.value)}
+              placeholder={isRtl 
+                ? "الصق تفاصيل سيرتك الذاتية هنا (مثال: الاسم، البريد، الخبرات السابقة مع الفترات الزمنية والجامعة...)" 
+                : "Paste your raw text (e.g. John Doe, Web Developer at Tech Inc (2021-2023), BS Computer Science...)"}
+              className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-xs outline-none focus:border-indigo-500 focus:bg-white transition text-slate-800 font-sans leading-relaxed"
+            />
+            <div className="flex justify-end gap-2">
               <button
                 onClick={handleParseCV}
-                disabled={parsing || (activeParserTab === "pdf" ? !cvPdfToParse : !cvTextToParse.trim())}
+                disabled={parsing || !cvTextToParse.trim()}
                 className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md shadow-indigo-600/10"
               >
                 {parsing ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <span>🪄</span>}
