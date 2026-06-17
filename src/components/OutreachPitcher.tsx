@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Sparkles, Copy, Send, Linkedin, Mail, MessageSquare, AlertCircle, Loader2, Check } from "lucide-react";
 import { CVData } from "../types";
+import { getAuthHeaders } from "../App";
 
 interface OutreachPitcherProps {
   cvData: CVData;
@@ -16,7 +17,7 @@ export function OutreachPitcher({ cvData, language }: OutreachPitcherProps) {
   const [tone, setTone] = useState<"formal" | "friendly" | "persuasive">("formal");
   const [loading, setLoading] = useState(false);
   const [generatedPitch, setGeneratedPitch] = useState("");
-  // isSimulated removed - Groq always returns real results
+  const [isSimulated, setIsSimulated] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleGenerate = async () => {
@@ -25,7 +26,7 @@ export function OutreachPitcher({ cvData, language }: OutreachPitcherProps) {
     try {
       const res = await fetch("/api/ai/pitch", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({
           cvData,
           targetCompany,
@@ -39,13 +40,13 @@ export function OutreachPitcher({ cvData, language }: OutreachPitcherProps) {
       const data = await res.json();
       if (data.success) {
         setGeneratedPitch(data.pitch);
-        // simulated flag removed
+        setIsSimulated(!!data.simulated);
       } else {
-        setPitchError(isRtl ? "فشلت عملية إنشاء الرسالة." : "Failed to generate outreach pitch.");
+        alert(isRtl ? "فشلت عملية إنشاء الرسالة." : "Failed to generate outreach pitch.");
       }
     } catch (err) {
       console.error(err);
-      setPitchError(isRtl ? "حدث خطأ غير متوقع." : "An unexpected error occurred.");
+      alert(isRtl ? "حدث خطأ غير متوقع." : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -209,7 +210,7 @@ export function OutreachPitcher({ cvData, language }: OutreachPitcherProps) {
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{isRtl ? "جاري صياغة رسالتك بالذكاء الاصطناعي..." : "Generating your pitch with AI..."}</span>
+                    <span>{isRtl ? "جاري صياغة رسالتك بالذكاء الاصطناعي..." : "Generating pitch with Gemini..."}</span>
                   </>
                 ) : (
                   <>
@@ -277,13 +278,13 @@ export function OutreachPitcher({ cvData, language }: OutreachPitcherProps) {
               </div>
             </div>
 
-            {false && (
+            {isSimulated && (
               <div className="flex items-center gap-2 justify-center bg-amber-50/65 px-4 py-2 border border-amber-100 rounded-lg max-w-lg mx-auto">
                 <AlertCircle className="w-4 h-4 text-amber-500" />
                 <span className="text-[10px] text-amber-800 font-medium">
                   {isRtl
-                    ? "*تم توليد الرسالة بالذكاء الاصطناعي بناءً على بيانات سيرتك."
-                    : "*Generated with AI based on your CV data."}
+                    ? "*تم توليد الرسالة افتراضياً بمراعاة بيانات سيرتك وخبراتك للتوضيح لعدم تمكين مفتاح Gemini."
+                    : "*Demo simulation rendered. Set GEMINI_API_KEY inside Settings to fetch live tailored drafts."}
                 </span>
               </div>
             )}
