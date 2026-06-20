@@ -3,10 +3,13 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import rateLimit from "express-rate-limit";
 import { groqChat } from "./src/utils/groqClient.js";
+import { migrateFromJsonIfNeeded } from "./server/db.js";
 
 // Load environment variables
 dotenv.config();
+migrateFromJsonIfNeeded(); // One-time migration from legacy users.json (if present)
 
 import { getStoredJobs, forceRefreshJobs } from "./server/jobSource.js";
 import { getInfluencerPosts } from "./server/influencers.js";
@@ -32,7 +35,36 @@ import {
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
+// ─── Rate Limiters ──────────────────────────────────────────────
+// عام: 100 طلب لكل 15 دقيقة لكل IP
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  message: { success: false, message: "طلبات كثيرة جداً. حاول بعد قليل." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// AI Routes: 20 طلب لكل 15 دقيقة — حماية لـ Groq quota
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  message: { success: false, message: "تجاوزت الحد المسموح من طلبات الذكاء الاصطناعي. حاول بعد 15 دقيقة." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Auth: 10 محاولات لكل 15 دقيقة — حماية من brute-force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  message: { success: false, message: "محاولات تسجيل كثيرة جداً. حاول بعد 15 دقيقة." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(express.json());
+app.use("/api/", generalLimiter);
 
 
 // -------------------------------------------------------------------
@@ -114,11 +146,17 @@ app.post("/api/auth/demo", async (req, res) => {
 });
 
 // 1.1 USER AUTH & REGISTER
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", authLimiter, (req, res) => {
   try {
     const { email, password, name } = req.body;
     if (!email || !password || !name) {
       return res.status(400).json({ success: false, message: "يرجى تعبئة جميع الحقول المطلوبة." });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل." });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, message: "البريد الإلكتروني غير صالح." });
     }
     const result = registerUser(email, password, name);
     if (!result.success) {
@@ -131,7 +169,7 @@ app.post("/api/auth/register", (req, res) => {
 });
 
 // 1.2 USER LOGIN
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", authLimiter, (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -335,7 +373,7 @@ app.post("/api/telegram/trigger-broadcast", async (req, res) => {
 // -------------------------------------------------------------------
 
 // 9. ATS ANALYZER (COMPUTES ATS SCORE, REMOVES POOR FORMATS & DECLARES GAP KEYWORDS)
-app.post("/api/cv/ats", async (req, res) => {
+app.post("/api/cv/ats", aiLimiter, async (req, res) => {
   const { cvText, jobDescription } = req.body;
   if (!cvText || !jobDescription) {
     return res.status(400).json({ success: false, message: "يرجى ملء نص الـ CV ووصف الوظيفة." });
@@ -376,7 +414,7 @@ ${cvText}
 });
 
 // 10. AI CV CUSTOM TAILORER
-app.post("/api/cv/tailor", async (req, res) => {
+app.post("/api/cv/tailor", aiLimiter, async (req, res) => {
   const { cvData, jobDescription } = req.body;
   if (!cvData || !jobDescription) {
     return res.status(400).json({ success: false, message: "البيانات ناقصة." });
@@ -404,7 +442,7 @@ ${jobDescription}
 });
 
 // 11. INTERVIEW SIMULATION - COMMENCE
-app.post("/api/interview/start", async (req, res) => {
+app.post("/api/interview/start", aiLimiter, async (req, res) => {
   const { jobTitle } = req.body;
   if (!jobTitle) return res.status(400).json({ success: false, message: "مسمى الوظيفة مطلوب." });
 
@@ -423,7 +461,7 @@ JSON فقط: {"questions": ["س1","س2","س3","س4","س5"]}` }
 });
 
 // 12. INTERVIEW EVALUATOR & SCORE RECORDER
-app.post("/api/interview/evaluate", async (req, res) => {
+app.post("/api/interview/evaluate", aiLimiter, async (req, res) => {
   const { question, answer, jobTitle } = req.body;
   if (!question || !answer) {
     return res.status(400).json({ success: false, message: "السؤال والإجابة مطلوبان." });
@@ -448,7 +486,7 @@ app.post("/api/interview/evaluate", async (req, res) => {
 });
 
 // 12.5 AI RESUME / PORTFOLIO PARSER
-app.post("/api/profile/parse", async (req, res) => {
+app.post("/api/profile/parse", aiLimiter, async (req, res) => {
   const { cvText } = req.body;
   if (!cvText || cvText.trim() === "") {
     return res.status(400).json({ success: false, message: "يرجى تقديم نص السيرة الذاتية لاستخلاصه." });
@@ -485,7 +523,7 @@ JSON المطلوب:
 });
 
 // 13. AI OUTREACH MESSAGE GENERATOR (PITCHER)
-app.post("/api/ai/pitch", async (req, res) => {
+app.post("/api/ai/pitch", aiLimiter, async (req, res) => {
   const { cvData, targetCompany, targetRole, jdText, platform, tone, language } = req.body;
   if (!cvData) {
     return res.status(400).json({ success: false, message: "بيانات السيرة الذاتية مفقودة." });
@@ -516,7 +554,7 @@ app.post("/api/ai/pitch", async (req, res) => {
 });
 
 // 14. AI CONTRACT SAFETY AUDIT & TRAVEL ROADMAP ADVISOR
-app.post("/api/ai/contract-audit", async (req, res) => {
+app.post("/api/ai/contract-audit", aiLimiter, async (req, res) => {
   const { jobTitle, salary, currency, country, hasHousing, hasTransport, hasMedical, hasFlights, extraText, language } = req.body;
   
   const isAr = language === "ar";
@@ -552,8 +590,31 @@ app.post("/api/ai/contract-audit", async (req, res) => {
 
 
 
+
+// /api/chat — CareerAccelerator chat (alias to coach endpoint)
+app.post("/api/chat", aiLimiter, async (req, res) => {
+  const { message, history } = req.body;
+  if (!message) return res.status(400).json({ success: false });
+  try {
+    const messages = [
+      ...(history || []).map((h: any) => ({
+        role: h.role === "model" ? "assistant" : "user",
+        content: Array.isArray(h.parts) ? h.parts[0]?.text || "" : h.content || ""
+      })),
+      { role: "user", content: message }
+    ];
+    const reply = await groqChat([
+      { role: "system", content: "أنت مساعد مهني ذكي متخصص في التوظيف وتطوير المسار المهني. أجب بإيجاز وعملية." },
+      ...messages
+    ], false);
+    res.json({ success: true, reply });
+  } catch (err) {
+    res.status(500).json({ success: false, message: (err as Error).message });
+  }
+});
+
 // ─── MASAR COACH ENDPOINT ─────────────────────────────────────────
-app.post("/api/coach/chat", async (req, res) => {
+app.post("/api/coach/chat", aiLimiter, async (req, res) => {
   const { systemPrompt, messages } = req.body;
   if (!systemPrompt || !messages?.length) {
     return res.status(400).json({ success: false, message: "systemPrompt and messages required" });
