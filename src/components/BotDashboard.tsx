@@ -156,8 +156,9 @@ export const BotDashboard: React.FC<BotDashboardProps> = ({ language, t }) => {
                     ? "bg-slate-900 text-slate-100 self-start rounded-tl-none border border-slate-850"
                     : "bg-indigo-600 text-white self-end rounded-tr-none"
                 }`}
-                dangerouslySetInnerHTML={{ __html: msg.text }}
-              />
+              >
+                {msg.text.replace(/<[^>]+>/g, "").replace(/&#[0-9]+;/g, "")}
+              </div>
             ))}
             <div ref={chatEndRef} />
           </div>
