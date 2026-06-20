@@ -856,7 +856,6 @@ export const MasarJourneyHome: React.FC<MasarJourneyHomeProps> = ({
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(currentMemoData.text);
-                  alert(isRtl ? "📋 تم نسخ الصياغة القانونية النموذجية بنجاح! يمكنك الآن تعديلها في مستنداتك." : "📋 Copy completed! Paste legally compliant draft into your Word documents.");
                 }}
                 className="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs px-6 py-3 rounded-xl transition cursor-pointer"
               >
