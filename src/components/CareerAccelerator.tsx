@@ -36,11 +36,38 @@ export function CareerAccelerator({
   const isRtl = language === "ar";
   const [offlineStatus, setOfflineStatus] = useState<"synced" | "saving">("synced");
 
-  // --- STATS & TRACKERS ---
-  const [applicationsCount] = useState(24);
-  const [responseRate] = useState(25);
-  const [interviewsCount] = useState(4);
-  const [streakDays] = useState(5);
+  // --- REAL STATS — computed from actual user activity in localStorage ---
+  const [applicationsCount, setApplicationsCount] = useState(0);
+  const [responseRate, setResponseRate] = useState(0);
+  const [interviewsCount, setInterviewsCount] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
+
+  useEffect(() => {
+    // Tailored CV applications — count of times user used "Tailor My CV"
+    const tailorCount = parseInt(localStorage.getItem("masar_tailor_count") || "0", 10);
+    setApplicationsCount(tailorCount);
+
+    // Interview practice sessions — from InterviewSim score history
+    const interviewAvg = localStorage.getItem("masar_last_interview_avg");
+    const interviewSessions = parseInt(localStorage.getItem("masar_interview_sessions") || "0", 10);
+    setInterviewsCount(interviewSessions);
+
+    // Response rate — based on ATS score as a proxy signal (higher ATS = more likely callbacks)
+    const atsScore = parseInt(localStorage.getItem("masar_last_ats_score") || "0", 10);
+    setResponseRate(atsScore > 0 ? Math.round(atsScore * 0.4) : 0); // conservative estimate
+
+    // Activity streak — days with at least one recorded action
+    const streakData = localStorage.getItem("masar_activity_streak");
+    const today = new Date().toDateString();
+    let streak: { lastDate: string; count: number } = streakData ? JSON.parse(streakData) : { lastDate: "", count: 0 };
+
+    if (streak.lastDate !== today) {
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      streak = { lastDate: today, count: streak.lastDate === yesterday ? streak.count + 1 : 1 };
+      localStorage.setItem("masar_activity_streak", JSON.stringify(streak));
+    }
+    setStreakDays(streak.count);
+  }, []);
 
   // --- INTERACTIVE AI CAREER COACH STATE (Retained as a premium sidebar widget!) ---
   const [coachMessages, setCoachMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([
@@ -134,23 +161,28 @@ export function CareerAccelerator({
           </div>
         </div>
 
-        {/* Dynamic Statistics Strip */}
+        {/* Dynamic Statistics Strip — computed from real activity */}
+        {applicationsCount === 0 && interviewsCount === 0 && responseRate === 0 && (
+          <p className="text-[10px] text-indigo-300/70 pt-4 border-t border-white/10 mt-4">
+            {isRtl ? "💡 ابدأ استخدام الأدوات وستظهر إحصائياتك هنا تلقائياً." : "💡 Start using the tools and your stats will appear here automatically."}
+          </p>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-6 border-t border-white/10 mt-6 text-center">
           <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
             <span className="text-xl font-black text-emerald-400 block">{applicationsCount}</span>
-            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "تقديمات الـ CRM" : "CRM Applications"}</span>
+            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "مرات تخصيص السيرة" : "CV Tailored"}</span>
           </div>
           <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
             <span className="text-xl font-black text-indigo-300 block">%{responseRate}</span>
-            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "معدل استجابة الهيئات" : "Response Rate"}</span>
+            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "تقدير معدل الاستجابة" : "Est. Response Rate"}</span>
           </div>
           <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
             <span className="text-xl font-black text-amber-400 block">{interviewsCount}</span>
-            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "مقابلات تيسرت" : "Mock Interviews"}</span>
+            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "مقابلات تدريبية" : "Practice Interviews"}</span>
           </div>
           <div className="bg-white/5 p-3 rounded-2xl border border-white/5">
             <span className="text-xl font-black text-sky-400 block">🔥 {streakDays} {isRtl ? "أيام" : "Days"}</span>
-            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "معدل الزحف النشط" : "Daily Matching Sync"}</span>
+            <span className="text-[10px] text-white/50 font-bold">{isRtl ? "أيام النشاط المتتالية" : "Activity Streak"}</span>
           </div>
         </div>
       </div>
