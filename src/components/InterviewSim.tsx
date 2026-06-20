@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Send, Star, AlertCircle, Loader2, Undo, Play } from "lucide-react";
+import { Send, Star, AlertCircle, Loader2, Undo, Play, MessageSquareCode } from "lucide-react";
+import { apiFetchJson, ApiAuthError } from "../utils/apiClient";
 
 interface InterviewSimProps {
   language: "ar" | "en";
@@ -26,12 +27,10 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
     setStage("loading");
 
     try {
-      const res = await fetch("/api/interview/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobTitle })
-      });
-      const data = await res.json();
+      const data = await apiFetchJson<{ success: boolean; questions?: string[]; message?: string }>(
+        "/api/interview/start",
+        { method: "POST", body: JSON.stringify({ jobTitle }) }
+      );
       if (data.success && Array.isArray(data.questions) && data.questions.length > 0) {
         setQuestions(data.questions);
         setCurrentIdx(0);
@@ -43,7 +42,11 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
         throw new Error(data.message || "Failed to load questions");
       }
     } catch (err) {
-      setErrorMsg(isRtl ? "فشل بدء المقابلة. يرجى التحقق من الشبكة والمحاولة لاحقاً." : "Initialization failed. Check network and retry.");
+      if (err instanceof ApiAuthError) {
+        setErrorMsg(isRtl ? "يرجى تسجيل الدخول لاستخدام محاكي المقابلات." : "Please log in to use the interview simulator.");
+      } else {
+        setErrorMsg((err as Error).message || (isRtl ? "فشل بدء المقابلة. يرجى المحاولة لاحقاً." : "Failed to start interview. Please retry."));
+      }
       setStage("idle");
     }
   };
@@ -54,38 +57,40 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/interview/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: questions[currentIdx],
-          answer: currentAnswer,
-          jobTitle
-        })
-      });
-      const data = await res.json();
+      const data = await apiFetchJson<{ success: boolean; score?: number; feedback?: string; message?: string }>(
+        "/api/interview/evaluate",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            question: questions[currentIdx],
+            answer: currentAnswer,
+            jobTitle
+          })
+        }
+      );
 
       if (data.success) {
         setFeedbacks([...feedbacks, { score: data.score || 4, text: data.feedback || "" }]);
         setAnswers([...answers, currentAnswer]);
         setCurrentAnswer("");
-        
-        if (currentIdx < 4) {
+
+        // FIX: نعتمد على طول قائمة الأسئلة الفعلية بدل رقم ثابت (5)،
+        // لو الـ AI رجّع عدد أسئلة مختلف لا ينكسر المنطق
+        if (currentIdx < questions.length - 1) {
           setCurrentIdx(currentIdx + 1);
           setStage("chatting");
         } else {
           setStage("finished");
-          const avg = feedbacks.length > 0 ? ((feedbacks.reduce((a,f)=>a+f.score,0) + (data.score||4)) / (feedbacks.length+1)).toFixed(1) : (data.score||4);
-          localStorage.setItem("masar_last_interview_avg", String(avg));
-          // Track real session count for CareerAccelerator stats
-          const sessionCount = parseInt(localStorage.getItem("masar_interview_sessions") || "0", 10);
-          localStorage.setItem("masar_interview_sessions", String(sessionCount + 1));
         }
       } else {
         throw new Error(data.message || "Failed evaluation");
       }
     } catch (err) {
-      setErrorMsg(isRtl ? "فشل تقييم الإجابة. أعد المحاولة." : "Could not evaluate. Try again.");
+      if (err instanceof ApiAuthError) {
+        setErrorMsg(isRtl ? "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى." : "Session expired. Please log in again.");
+      } else {
+        setErrorMsg((err as Error).message || (isRtl ? "فشل تقييم الإجابة. أعد المحاولة." : "Could not evaluate. Try again."));
+      }
       setStage("chatting");
     }
   };
@@ -108,34 +113,45 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
   };
 
   return (
-    <div className="rounded-2xl p-6 md:p-8 space-y-6 text-white masar-animate-up" style={{background:"linear-gradient(135deg,#0f172a,#1a1040)"}}>
+    <div dir={isRtl ? "rtl" : "ltr"} className="bg-white text-slate-800 rounded-[2.5rem] border border-slate-100 p-8 md:p-14 space-y-10 shadow-sm relative overflow-hidden text-right print:text-left">
+      {/* Decorative Blobs */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-indigo-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-to-tr from-emerald-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
+
       {/* Header */}
-      <div className="space-y-2 border-b border-slate-850 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600/20 text-indigo-400 p-2 rounded-xl">
-            <span>🎤</span>
+      <div className="space-y-3 pb-6 border-b border-slate-100 relative z-10">
+        <div className="flex items-center gap-4">
+          <div className="bg-indigo-50 text-indigo-600 p-3.5 rounded-2xl shadow-2xs">
+            <MessageSquareCode className="w-6 h-6 shrink-0" />
           </div>
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-white">{t.intHeader}</h2>
-            <p className="text-sm text-slate-400 mt-0.5">{isRtl ? "تدريب تفاعلي عبر الذكاء الاصطناعي" : "Interact and master live interview feedback"}</p>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{t.intHeader}</h2>
+            <p className="text-xs md:text-sm text-slate-500 mt-0.5">{isRtl ? "تدريب تفاعلي عبر الذكاء الاصطناعي مع تقييم لحظي لكل إجابة صوتاً وكتابةً" : "Interact and master live interview feedback powered by Gemini AI"}</p>
           </div>
         </div>
       </div>
 
       {errorMsg && (
-        <div className="bg-rose-500/10 text-rose-300 border border-rose-500/20 p-4 rounded-xl flex items-center gap-2 text-sm font-sans">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div className="bg-rose-50 border border-rose-100 text-rose-700 py-3.5 px-5 rounded-2xl flex items-center gap-2.5 text-xs font-medium font-sans">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* STAGE: IDLE */}
       {stage === "idle" && (
-        <div className="space-y-6 pt-2 max-w-xl mx-auto text-center md:py-8">
-          <p className="text-slate-300 text-sm leading-relaxed max-w-md mx-auto">{t.intIntro}</p>
+        <div className="space-y-8 pt-4 max-w-xl mx-auto text-center md:py-10 relative z-10">
+          <div className="space-y-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 border border-slate-100 text-slate-400">
+              <MessageSquareCode className="w-8 h-8 text-indigo-500" />
+            </div>
+            <p className="text-slate-600 text-xs md:text-sm leading-relaxed max-w-md mx-auto font-sans font-light">
+              {t.intIntro}
+            </p>
+          </div>
 
-          <div className="space-y-3 pt-2">
-            <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider text-right print:text-left">
+          <div className="space-y-3.5 pt-4">
+            <label className="block text-slate-700 text-xs font-black uppercase tracking-wider text-right font-sans">
               {t.intJobTitle}
             </label>
             <input
@@ -143,40 +159,50 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
               placeholder={isRtl ? "مثال: محاسب تكاليف ومخازن، مطور React..." : "e.g., Financial Accountant, UI Tester..."}
-              className="masar-input text-sm" style={{background:"rgba(0,0,0,0.3)",borderColor:"rgba(255,255,255,0.1)",color:"white"}}
+              className="w-full bg-slate-50/50 hover:bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white text-xs md:text-sm font-sans px-5 py-4 rounded-2xl outline-none transition duration-150 shadow-2xs placeholder:text-slate-400 text-slate-800"
             />
           </div>
 
-          <button
-            onClick={startInterview}
-            className="masar-btn masar-btn-primary w-full md:w-auto md:px-8 py-3 text-sm"
-          >
-            <Play className="w-4 h-4" />
-            <span>{t.intStartBtn}</span>
-          </button>
+          <div className="pt-4">
+            <button
+              onClick={startInterview}
+              className="w-full md:w-auto md:px-10 bg-indigo-600 hover:bg-indigo-700 active:scale-98 transition duration-200 text-xs md:text-sm font-black text-white py-4 rounded-2xl flex items-center justify-center gap-2.5 shadow-lg shadow-indigo-600/15 cursor-pointer mx-auto"
+            >
+              <Play className="w-4 h-4 fill-white" />
+              <span>{t.intStartBtn}</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* STAGE: LOADING */}
       {stage === "loading" && (
-        <div className="flex flex-col items-center justify-center py-16 space-y-4">
-          <Loader2 className="w-10 h-10 animate-spin text-indigo-400" />
-          <p className="text-slate-300 text-sm animate-pulse">{isRtl ? "جاري صياغة ٥ أسئلة مخصصة بالذكاء الاصطناعي..." : "Formulating 5 personalized questions with AI..."}</p>
+        <div className="flex flex-col items-center justify-center py-20 space-y-5 relative z-10">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin" />
+          </div>
+          <p className="text-slate-600 text-xs md:text-sm font-medium animate-pulse">{isRtl ? "جاري قياس وصياغة ٥ أسئلة مخصصة من Gemini AI..." : "Formulating 5 candidate questions with Gemini AI..."}</p>
         </div>
       )}
 
       {/* STAGE: CHATTING OR SUBMITTING */}
       {(stage === "chatting" || stage === "submitting") && (
-        <div className="space-y-6 md:py-4">
+        <div className="space-y-8 md:py-4 relative z-10 text-right">
           {/* Progress gauge */}
-          <div className="flex justify-between items-center text-xs text-slate-400 border-b border-slate-850 pb-3">
-            <span>{t.intQuestionOf.replace("{index}", String(currentIdx + 1))}</span>
-            <div className="flex gap-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-500 border-b border-slate-100 pb-5">
+            <span className="font-extrabold font-sans">
+              {t.intQuestionOf ? t.intQuestionOf.replace("{index}", String(currentIdx + 1)) : `السؤال ${currentIdx + 1} من 5`}
+            </span>
+            <div className="flex gap-1.5 direction-ltr">
               {[...Array(5)].map((_, i) => (
                 <div
                   key={i}
-                  className={`h-2 w-8 rounded ${
-                    i < currentIdx ? "bg-emerald-500" : i === currentIdx ? "bg-indigo-500 animate-pulse" : "bg-slate-800"
+                  className={`h-2.5 w-10 rounded-full transition-all duration-300 ${
+                    i < currentIdx 
+                      ? "bg-emerald-500" 
+                      : i === currentIdx 
+                        ? "bg-indigo-600 animate-pulse w-14" 
+                        : "bg-slate-150 bg-slate-100"
                   }`}
                 />
               ))}
@@ -184,23 +210,23 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
           </div>
 
           {/* Current Question */}
-          <div className="rounded-2xl p-6 space-y-3" style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.08)"}}>
-            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">
+          <div className="bg-indigo-50/30 border border-indigo-100/50 p-6 md:p-8 rounded-3xl space-y-4 shadow-3xs">
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 font-sans block leading-none">
               {isRtl ? "سؤال المقابلة الحالي:" : "Current Interview Question:"}
             </span>
-            <p className="text-md md:text-lg font-medium leading-relaxed text-slate-100">{questions[currentIdx]}</p>
+            <p className="text-sm md:text-base font-extrabold leading-relaxed text-slate-900">{questions[currentIdx]}</p>
           </div>
 
           {/* Answer Inputs */}
-          <div className="space-y-3">
-            <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider">{t.intYourAnswer}</label>
+          <div className="space-y-3.5">
+            <label className="block text-slate-700 text-xs font-black uppercase tracking-wider font-sans">{t.intYourAnswer}</label>
             <textarea
-              rows={4}
+              rows={5}
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
               disabled={stage === "submitting"}
               placeholder={isRtl ? "اكتب إجابتك الاحترافية بالتفصيل لتحصل على أفضل تقييم..." : "Formulate your thorough response to receive maximum stars..."}
-              className="masar-input text-sm disabled:opacity-50" style={{background:"rgba(0,0,0,0.3)",borderColor:"rgba(255,255,255,0.1)",color:"white"}}
+              className="w-full bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-indigo-600 text-xs md:text-sm p-4 rounded-2xl outline-none transition duration-150 disabled:opacity-60 leading-relaxed font-sans shadow-2xs placeholder:text-slate-400 text-slate-800"
             />
           </div>
 
@@ -209,7 +235,7 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
             <button
               onClick={submitAnswer}
               disabled={!currentAnswer.trim() || stage === "submitting"}
-              className="masar-btn masar-btn-primary px-6 py-3 text-sm disabled:opacity-20"
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-20 transition duration-200 font-bold text-xs md:text-sm text-white px-8 py-4 rounded-xl flex items-center justify-center gap-2"
             >
               {stage === "submitting" ? (
                 <>
@@ -227,27 +253,27 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
 
           {/* Display feedback of PREVIOUS questions to help them learn */}
           {feedbacks.length > 0 && (
-            <div className="space-y-4 pt-6 border-t border-slate-850">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500">
+            <div className="space-y-4 pt-8 border-t border-slate-100">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-sans">
                 {isRtl ? "تقييمات الأسئلة السابقة:" : "Prior Rounds Evaluations:"}
               </h4>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {feedbacks.map((fb, idx) => (
-                  <div key={idx} className="bg-slate-950/40 border border-slate-850 p-4 rounded-xl space-y-2">
+                  <div key={idx} className="bg-slate-50/50 border border-slate-100 p-6 rounded-3xl space-y-3 shadow-3xs text-right">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-medium text-slate-300">
+                      <span className="font-extrabold text-slate-600 font-sans">
                         {isRtl ? `الرد على السؤال ${idx + 1}` : `Round ${idx + 1} Assessment`}
                       </span>
-                      <div className="flex flex-row-reverse gap-0.5 text-amber-400">
+                      <div className="flex gap-0.5 text-amber-500">
                         {[...Array(5)].map((_, sIdx) => (
                           <Star
                             key={sIdx}
-                            className={`w-3.5 h-3.5 ${sIdx < fb.score ? "fill-amber-400 text-amber-400" : "text-slate-800"}`}
+                            className={`w-4 h-4 ${sIdx < fb.score ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
                           />
                         ))}
                       </div>
                     </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">{fb.text}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed font-sans font-light">{fb.text}</p>
                   </div>
                 ))}
               </div>
@@ -256,89 +282,72 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
         </div>
       )}
 
-
       {/* STAGE: FINISHED REPORT CARD */}
-      {stage === "finished" && (() => {
-        const avg = calculateAverageScore();
-        const avgPct = Math.round((avg / 5) * 100);
-        const level = avg >= 4 ? (isRtl ? "ممتاز 🏆" : "Excellent 🏆")
-          : avg >= 3 ? (isRtl ? "جيد جداً ⭐" : "Very Good ⭐")
-          : (isRtl ? "يحتاج تطوير 📈" : "Needs Improvement 📈");
-        const color = avg >= 4 ? "#059669" : avg >= 3 ? "#d97706" : "#dc2626";
-        const bg = avg >= 4 ? "#ecfdf5" : avg >= 3 ? "#fffbeb" : "#fff1f2";
-        return (<>
-        <div className="space-y-5 masar-animate-scale">
-          {/* Hero Score Card */}
-          <div className="rounded-3xl p-7 text-center space-y-4" style={{background:"linear-gradient(135deg,#0f172a,#1e1b4b)"}}>
-            <div className="text-5xl">🏆</div>
-            <h3 className="text-2xl font-black text-white">{isRtl ? "انتهت المقابلة!" : "Interview Complete!"}</h3>
-
-            {/* Big Score */}
-            <div className="inline-flex flex-col items-center gap-2 rounded-2xl px-8 py-5 mx-auto"
-              style={{background:bg, color}}>
-              <span className="text-5xl font-black">{avgPct}%</span>
-              <span className="text-sm font-black">{level}</span>
+      {stage === "finished" && (
+        <div className="space-y-8 py-4 max-w-xl mx-auto relative z-10 text-right">
+          <div className="text-center space-y-3">
+            <div className="inline-flex bg-emerald-50 text-emerald-600 p-4 rounded-full text-3xl shadow-3xs">
+              <span>🏆</span>
             </div>
+            <h3 className="text-xl md:text-2xl font-bold text-slate-950">{t.intReport}</h3>
+            <p className="text-xs text-slate-500">{t.intSuccess}</p>
+          </div>
 
-            {/* Stars */}
-            <div className="flex justify-center gap-1.5">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className={`w-6 h-6 transition-all ${
-                  i < Math.round(avg) ? "fill-amber-400 text-amber-400" : "text-slate-700"
-                }`} />
+          {/* Major score widget */}
+          <div className="bg-slate-50 border border-slate-100 p-8 rounded-3xl flex flex-col items-center justify-center space-y-4 shadow-3xs">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest font-sans">{t.intAvgScore}</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-5xl font-extrabold text-slate-900">{calculateAverageScore()}</span>
+              <span className="text-lg text-slate-400">/ 5</span>
+            </div>
+            <div className="flex gap-1.5 text-amber-500 pb-1">
+              {[...Array(5)].map((_, sIdx) => (
+                <Star
+                  key={sIdx}
+                  className={`w-6 h-6 ${sIdx < Math.round(calculateAverageScore()) ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
+                />
               ))}
-              <span className="text-white font-black text-lg mr-2">{avg}/5</span>
             </div>
           </div>
 
-          {/* Per-Question Breakdown */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">
-              {isRtl ? "تفاصيل الأداء" : "Performance Breakdown"}
+          {/* Question breakdown list */}
+          <div className="space-y-4">
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-sans">
+              {isRtl ? "تفصيل الأداء لكل سؤال:" : "Performance Breakdown per Round:"}
             </h4>
-            {questions.map((q, idx) => {
-              const fb = feedbacks[idx];
-              const qScore = fb?.score || 0;
-              const qPct = Math.round((qScore / 5) * 100);
-              return (
-                <div key={idx} className="rounded-2xl p-4 space-y-3"
-                  style={{background:"rgba(0,0,0,0.25)",border:"1px solid rgba(255,255,255,0.07)"}}>
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-xs font-bold text-slate-300 flex-1">{idx + 1}. {q}</p>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`w-3.5 h-3.5 ${i < qScore ? "fill-amber-400 text-amber-400" : "text-slate-700"}`} />
-                      ))}
-                    </div>
+            <div className="space-y-5">
+              {questions.map((q, idx) => (
+                <div key={idx} className="bg-white border border-slate-100 rounded-3xl p-6 space-y-3 shadow-3xs text-xs">
+                  <div className="font-extrabold text-slate-800 text-sm leading-relaxed">
+                    {idx + 1}. {q}
                   </div>
-                  {/* Progress bar */}
-                  <div className="masar-progress">
-                    <div className="masar-progress-fill" style={{width:`${qPct}%`, background: qScore >= 4 ? "#059669" : qScore >= 3 ? "#d97706" : "#dc2626"}} />
+                  <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 text-slate-600 leading-relaxed font-sans font-light">
+                    <span className="font-bold text-slate-700 block mb-1">
+                      {isRtl ? "إجابتك:" : "Your Response:"}
+                    </span>
+                    {answers[idx]}
                   </div>
-                  {fb?.text && (
-                    <p className="text-[11px] text-slate-400 leading-relaxed border-t border-white/5 pt-2">
-                      <span className="text-indigo-400 font-bold">{isRtl ? "التقييم: " : "Feedback: "}</span>
-                      {fb.text}
-                    </p>
-                  )}
+                  <div className="text-slate-600 leading-relaxed pt-1 flex gap-2.5 font-sans">
+                    <span className="text-indigo-600 font-bold shrink-0">
+                      {isRtl ? "توجيه روبوت المقابلات:" : "Advisor Response:"}
+                    </span>
+                    <span className="font-light">{feedbacks[idx]?.text}</span>
+                  </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-
-
 
           {/* Reset tab */}
           <button
             onClick={resetInterview}
-            className="masar-btn masar-btn-ghost w-full py-3 text-sm text-slate-300 border-slate-700"
+            className="w-full bg-slate-900 hover:bg-slate-800 active:scale-98 transition duration-200 py-4 rounded-2xl font-black text-xs md:text-sm text-white flex items-center justify-center gap-2.5 cursor-pointer shadow-lg"
           >
-            <Undo className="w-4 h-4" />
+            <Undo className="w-4 h-4 text-white" />
             <span>{t.intRetake}</span>
           </button>
         </div>
-        </>);
-      })()}
+      )}
     </div>
   );
 };
