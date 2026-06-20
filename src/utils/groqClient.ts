@@ -1,3 +1,4 @@
+/// <reference types="node" />
 // ─── Groq AI Client (مجاني ١٠٠٪ على free tier) ─────────────────
 // يستخدم llama-3.3-70b - نفس جودة GPT-4 تقريباً ومجاني
 
