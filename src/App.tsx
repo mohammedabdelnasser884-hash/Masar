@@ -162,6 +162,11 @@ export default function App() {
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [toast, setToast] = useState<{msg: string; type: "success"|"error"|"info"} | null>(null);
+  const showToast = (msg: string, type: "success"|"error"|"info" = "success") => {
+    setToast({msg, type});
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const [activeUser, setActiveUser] = useState<{ id: string; email: string; name: string; profile: any } | null>(() => {
     const saved = localStorage.getItem("masar_active_user");
@@ -337,8 +342,8 @@ export default function App() {
     reader.onload = (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
-        if (parsed?.personal) { setCvData(parsed); alert(isRtl ? "تم استعادة النسخة بنجاح!" : "Backup restored!"); }
-      } catch { alert("Invalid JSON format."); }
+        if (parsed?.personal) { setCvData(parsed); showToast(isRtl ? "✅ تم استعادة النسخة بنجاح!" : "✅ Backup restored!"); }
+      } catch { showToast(isRtl ? "❌ صيغة الملف غير صحيحة." : "❌ Invalid JSON format.", "error"); }
     };
     reader.readAsText(file);
   };
@@ -349,6 +354,9 @@ export default function App() {
     const expText = cvData.experience.map(e => `${e.role} at ${e.company}:${e.description}`).join("\n");
     setAtsCvText(`Name: ${cvData.personal.name}\nTitle: ${cvData.personal.title}\nSummary: ${cvData.personal.summary}\nExperience:\n${expText}\nSkills: ${cvData.skills.join(", ")}`);
     setActiveTab("cv_ats");
+    // Track real activity for CareerAccelerator stats
+    const count = parseInt(localStorage.getItem("masar_tailor_count") || "0", 10);
+    localStorage.setItem("masar_tailor_count", String(count + 1));
   };
 
   const executeAiTailoring = async () => {
@@ -375,7 +383,7 @@ export default function App() {
     const eduText = cvData.education.map(ed => `- ${ed.degree} @ ${ed.institution} (${ed.duration})`).join("\n");
     const text = `=== ${cvData.personal.name} ===\n${cvData.personal.title}\n✉️ ${cvData.personal.email} | 📞 ${cvData.personal.phone}\n📍 ${cvData.personal.location}\n\n--- SUMMARY ---\n${cvData.personal.summary}\n\n--- EXPERIENCE ---\n${expText}\n\n--- EDUCATION ---\n${eduText}\n\n--- SKILLS ---\n${cvData.skills.join(" • ")}`.trim();
     navigator.clipboard.writeText(text);
-    alert(isRtl ? "تم نسخ السيرة النصية بنجاح!" : "Plain CV text copied!");
+    showToast(isRtl ? "📋 تم النسخ بنجاح!" : "📋 Copied to clipboard!");
   };
 
   const navItems = NAV_ITEMS(isRtl);
@@ -747,11 +755,11 @@ export default function App() {
                           <button className="masar-btn masar-btn-dark w-full py-3 text-xs"
                             onClick={() => {
                               if (!cvData.personal?.name?.trim()) {
-                                alert(isRtl ? "⚠️ أضف اسمك أولاً قبل الطباعة." : "⚠️ Please add your name before printing.");
+                                showToast(isRtl ? "⚠️ أضف اسمك أولاً قبل الطباعة." : "⚠️ Please add your name first.", "error");
                                 return;
                               }
                               if (!cvData.experience?.length && !cvData.education?.length) {
-                                alert(isRtl ? "⚠️ أضف خبرة أو تعليم واحد على الأقل." : "⚠️ Add at least one experience or education entry.");
+                                showToast(isRtl ? "⚠️ أضف خبرة أو تعليم واحد على الأقل." : "⚠️ Add at least one experience entry.", "error");
                                 return;
                               }
                               window.print();
@@ -933,7 +941,7 @@ export default function App() {
                     <li>✓ {isRtl ? "حقن المهارات المفقودة" : "Auto keyword injection"}</li>
                   </ul>
                 </div>
-                <button onClick={() => { alert(isRtl ? "⚡ جاري إعداد بوابة الدفع!" : "⚡ Setting up payment!"); setIsPricingOpen(false); }}
+                <button onClick={() => { showToast(isRtl ? "⚡ سيتم تفعيل الدفع قريباً!" : "⚡ Payment gateway coming soon!", "info"); setIsPricingOpen(false); }}
                   className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-md transition">
                   {isRtl ? "اشترك الآن" : "Upgrade to Pro"}
                 </button>
@@ -955,7 +963,7 @@ export default function App() {
                     <li>✓ {isRtl ? "تحديثات قانون العمل" : "Labor law updates"}</li>
                   </ul>
                 </div>
-                <button onClick={() => { alert(isRtl ? "⚖️ جاري تجهيز الباقة القانونية!" : "⚖️ Setting up Legal bundle!"); setIsPricingOpen(false); }}
+                <button onClick={() => { showToast(isRtl ? "⚖️ الباقة القانونية قريباً!" : "⚖️ Legal bundle coming soon!", "info"); setIsPricingOpen(false); }}
                   className="w-full py-2.5 bg-white hover:bg-slate-100 text-slate-900 font-black text-xs rounded-xl transition">
                   {isRtl ? "تفعيل المستشار" : "Unlock Legal Suite"}
                 </button>
@@ -965,6 +973,19 @@ export default function App() {
         </div>
       )}
 
+
+      {/* ── Toast Notification ─────────────────────────────── */}
+      {toast && (
+        <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-xl text-sm font-bold text-white flex items-center gap-2 masar-animate-scale whitespace-nowrap ${
+          toast.type === "error" ? "" : toast.type === "info" ? "" : ""
+        }`}
+          style={{
+            background: toast.type === "error" ? "#dc2626" : toast.type === "info" ? "#6366f1" : "#059669",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)"
+          }}>
+          {toast.msg}
+        </div>
+      )}
       <footer className="max-w-7xl mx-auto text-center pt-8 mt-12 text-slate-300 text-[11px] px-4 pb-24 md:pb-10 no-print masar-divider">
         <p>© 2026 {isRtl ? "مسار - البوابة المفتوحة للباحثين عن العمل." : "Masar Job Hub & Intelligent ATS CV Portal."}</p>
       </footer>
