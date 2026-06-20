@@ -77,6 +77,9 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
           setStage("finished");
           const avg = feedbacks.length > 0 ? ((feedbacks.reduce((a,f)=>a+f.score,0) + (data.score||4)) / (feedbacks.length+1)).toFixed(1) : (data.score||4);
           localStorage.setItem("masar_last_interview_avg", String(avg));
+          // Track real session count for CareerAccelerator stats
+          const sessionCount = parseInt(localStorage.getItem("masar_interview_sessions") || "0", 10);
+          localStorage.setItem("masar_interview_sessions", String(sessionCount + 1));
         }
       } else {
         throw new Error(data.message || "Failed evaluation");
@@ -263,8 +266,7 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
           : (isRtl ? "يحتاج تطوير 📈" : "Needs Improvement 📈");
         const color = avg >= 4 ? "#059669" : avg >= 3 ? "#d97706" : "#dc2626";
         const bg = avg >= 4 ? "#ecfdf5" : avg >= 3 ? "#fffbeb" : "#fff1f2";
-
-        return (
+        return (<>
         <div className="space-y-5 masar-animate-scale">
           {/* Hero Score Card */}
           <div className="rounded-3xl p-7 text-center space-y-4" style={{background:"linear-gradient(135deg,#0f172a,#1e1b4b)"}}>
@@ -324,33 +326,7 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
             })}
           </div>
 
-          {/* Question breakdown list */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              {isRtl ? "تفصيل الأداء لكل سؤال:" : "Performance Breakdown per Round:"}
-            </h4>
-            <div className="space-y-4">
-              {questions.map((q, idx) => (
-                <div key={idx} className="bg-slate-950 border border-slate-900 rounded-xl p-4 space-y-2 text-xs">
-                  <div className="font-medium text-slate-300">
-                    {idx + 1}. {q}
-                  </div>
-                  <div className="bg-slate-950 p-2.5 rounded border border-slate-850 text-slate-400 leading-relaxed">
-                    <span className="font-bold text-slate-300 block mb-1">
-                      {isRtl ? "إجابتك:" : "Your Response:"}
-                    </span>
-                    {answers[idx]}
-                  </div>
-                  <div className="text-slate-400 leading-relaxed pt-1 flex gap-2">
-                    <span className="text-indigo-400 font-bold shrink-0">
-                      {isRtl ? "توجيه روبوت المقابلات:" : "Advisor Response:"}
-                    </span>
-                    <span>{feedbacks[idx]?.text}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+
 
           {/* Reset tab */}
           <button
@@ -361,7 +337,8 @@ export const InterviewSim: React.FC<InterviewSimProps> = ({ language, t }) => {
             <span>{t.intRetake}</span>
           </button>
         </div>
-      )}
+        </>);
+      })()}
     </div>
   );
 };
