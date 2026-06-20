@@ -1,8 +1,6 @@
-import fs from "fs";
-import path from "path";
+import bcrypt from "bcryptjs";
+import { db } from "./db.js";
 import { getStoredJobs } from "./jobSource.js";
-
-const FILE_PATH = path.join(process.cwd(), "data", "users.json");
 
 export interface UserProfile {
   personal: {
@@ -51,46 +49,34 @@ export interface User {
   profile: UserProfile;
 }
 
-// Read database
-function readUsersDb(): User[] {
-  try {
-    if (!fs.existsSync(FILE_PATH)) {
-      return [];
-    }
-    const content = fs.readFileSync(FILE_PATH, "utf-8");
-    return JSON.parse(content);
-  } catch (error) {
-    console.error("Error reading users.json", error);
-    return [];
-  }
+// ─── Row mapper ───────────────────────────────────────────────────
+function rowToUser(row: any): User {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    createdAt: row.created_at,
+    profile: JSON.parse(row.profile_json),
+  };
 }
 
-// Write database
-function writeUsersDb(users: User[]): void {
-  try {
-    const dir = path.dirname(FILE_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(FILE_PATH, JSON.stringify(users, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Error writing users.json", error);
-  }
+function findUserByEmail(email: string): User | undefined {
+  const row = db.prepare("SELECT * FROM users WHERE email = ?").get(email.toLowerCase().trim());
+  return row ? rowToUser(row) : undefined;
 }
 
-// 1. REGISTER
-export function registerUser(email: string, passwordHash: string, name: string) {
-  const users = readUsersDb();
+// ─── 1. REGISTER ────────────────────────────────────────────────
+export function registerUser(email: string, plainPassword: string, name: string) {
   const normalizedEmail = email.toLowerCase().trim();
-  
-  const exists = users.find(u => u.email.toLowerCase() === normalizedEmail);
+
+  const exists = findUserByEmail(normalizedEmail);
   if (exists) {
     return { success: false, message: "هذا البريد الإلكتروني مسجل بالفعل!" };
   }
 
   const defaultProfile: UserProfile = {
     personal: {
-      name: name,
+      name,
       title: "أخصائي / مهتم بوظائف جديدة",
       email: normalizedEmail,
       phone: "",
@@ -108,26 +94,28 @@ export function registerUser(email: string, passwordHash: string, name: string) 
     targetLocations: ["القاهرة", "الرياض", "عن بعد"]
   };
 
+  const passwordHash = bcrypt.hashSync(plainPassword, 10);
   const newUser: User = {
     id: `user-${Date.now()}`,
     email: normalizedEmail,
-    passwordHash: passwordHash, // for preview/applet simple plaintext or standard hash is robust
+    passwordHash,
     createdAt: new Date().toISOString(),
     profile: defaultProfile
   };
 
-  users.push(newUser);
-  writeUsersDb(users);
+  db.prepare(`
+    INSERT INTO users (id, email, password_hash, created_at, profile_json)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(newUser.id, newUser.email, newUser.passwordHash, newUser.createdAt, JSON.stringify(newUser.profile));
 
   return { success: true, user: { id: newUser.id, email: newUser.email, profile: newUser.profile } };
 }
 
-// 2. LOGIN
-export function loginUser(email: string, passwordHash: string) {
-  const users = readUsersDb();
-  const normalizedEmail = email.toLowerCase().trim();
+// ─── 2. LOGIN ───────────────────────────────────────────────────
+export function loginUser(email: string, plainPassword: string) {
+  const candidate = findUserByEmail(email);
+  const user = candidate && bcrypt.compareSync(plainPassword, candidate.passwordHash) ? candidate : undefined;
 
-  const user = users.find(u => u.email.toLowerCase() === normalizedEmail && u.passwordHash === passwordHash);
   if (!user) {
     return { success: false, message: "البريد الإلكتروني أو كلمة المرور غير صحيحة!" };
   }
@@ -135,118 +123,60 @@ export function loginUser(email: string, passwordHash: string) {
   return { success: true, user: { id: user.id, email: user.email, profile: user.profile } };
 }
 
-// 3. GET PROFILE
+// ─── 3. GET PROFILE ─────────────────────────────────────────────
 export function getProfile(email: string) {
-  const users = readUsersDb();
-  const normalizedEmail = email.toLowerCase().trim();
-
-  const user = users.find(u => u.email.toLowerCase() === normalizedEmail);
+  const user = findUserByEmail(email);
   if (!user) {
     return { success: false, message: "لم يتم العثور على المستخدم!" };
   }
-
   return { success: true, profile: user.profile };
 }
 
-// 4. UPDATE PROFILE
+// ─── 4. UPDATE PROFILE ──────────────────────────────────────────
 export function updateProfile(email: string, profile: UserProfile) {
-  const users = readUsersDb();
   const normalizedEmail = email.toLowerCase().trim();
+  const user = findUserByEmail(normalizedEmail);
 
-  const index = users.findIndex(u => u.email.toLowerCase() === normalizedEmail);
-  if (index === -1) {
+  if (!user) {
     return { success: false, message: "المستخدم غير موجود!" };
   }
 
-  users[index].profile = profile;
-  writeUsersDb(users);
+  db.prepare("UPDATE users SET profile_json = ? WHERE email = ?")
+    .run(JSON.stringify(profile), normalizedEmail);
 
-  return { success: true, profile: users[index].profile };
+  return { success: true, profile };
 }
 
-// 5. MATCHED JOBS COMPILER & REPORT ENGINE
+// ─── 5. MATCHED JOBS COMPILER ────────────────────────────────────
 export async function getMatchedJobs(email: string) {
-  const users = readUsersDb();
-  const normalizedEmail = email.toLowerCase().trim();
-
-  const user = users.find(u => u.email.toLowerCase() === normalizedEmail);
+  const user = findUserByEmail(email);
   if (!user) {
     return { success: false, message: "المستخدم غير موجود لعقد مطابقة!" };
   }
 
-  const profile = user.profile;
   const allJobs = await getStoredJobs();
+  const profile = user.profile;
 
-  // Basic scoring mechanism
-  const matchedList = allJobs.map(job => {
-    let score = 50; // default base score
-    const matchedKeywords: string[] = [];
-    const matchedLocations: string[] = [];
+  const profileText = [
+    profile.personal.title,
+    profile.personal.summary,
+    ...(profile.skills || []),
+    ...(profile.targetFields || []),
+  ].join(" ").toLowerCase();
 
-    const jobTitleLower = job.title.toLowerCase();
-    const jobDescLower = job.description.toLowerCase();
-    const jobLocLower = job.location.toLowerCase();
+  const scored = allJobs.map(job => {
+    const jobText = `${job.title} ${job.description} ${job.company}`.toLowerCase();
+    const words = jobText.split(/\s+/).filter(w => w.length > 3);
+    const matched = words.filter(w => profileText.includes(w));
+    let score = 35 + Math.min(55, Math.round((matched.length / Math.max(words.length, 1)) * 110));
 
-    // 1. Target fields match
-    profile.targetFields.forEach(field => {
-      const f = field.toLowerCase().trim();
-      if (f && (jobTitleLower.includes(f) || jobDescLower.includes(f))) {
-        score += 15;
-        matchedKeywords.push(field);
-      }
-    });
+    if (profile.targetLocations?.some(loc => job.location.includes(loc))) score += 5;
+    if (job.type === "remote" && profile.targetLocations?.some(l => l.includes("عن بعد") || l.toLowerCase().includes("remote"))) score += 8;
 
-    // 2. Skills match
-    profile.skills.forEach(skill => {
-      const s = skill.toLowerCase().trim();
-      if (s && (jobTitleLower.includes(s) || jobDescLower.includes(s))) {
-        score += 8;
-        matchedKeywords.push(skill);
-      }
-    });
+    return { ...job, matchScore: Math.min(98, Math.max(25, score)) };
+  });
 
-    // 3. Location match
-    profile.targetLocations.forEach(loc => {
-      const l = loc.toLowerCase().trim();
-      if (l && jobLocLower.includes(l)) {
-        score += 15;
-        matchedLocations.push(loc);
-      }
-    });
+  scored.sort((a, b) => b.matchScore - a.matchScore);
 
-    // Clamp score
-    score = Math.min(99, Math.max(45, score));
-
-    return {
-      ...job,
-      matchScore: score,
-      matchedKeywords: Array.from(new Set(matchedKeywords)),
-      matchedLocations: Array.from(new Set(matchedLocations))
-    };
-  })
-  // Sort by highest match score first, then newest
-  .sort((a, b) => b.matchScore - a.matchScore);
-
-  // Take top matched ones
-  const topMatches = matchedList.filter(m => m.matchScore >= 60).slice(0, 8);
-
-  // Generate dynamic Arabic summary report
-  let dailyReport = "";
-  
-
-  // Backup system report generator (if no key or AI failed)
-  if (!dailyReport) {
-    const jobTitlesStr = topMatches.map(m => m.title).slice(0, 3).join(" و ");
-    dailyReport = `نظام المطابقة الذكي أجرى تحليلاً شاملاً لكافة المجموعات المغلقة، وقنوات التوظيف المفعلة، وبحث الويب اليومي. 
-
-• رصدنا توافقاً مهنياً مرتفعاً بنسبة تصل إلى **${topMatches[0] ? topMatches[0].matchScore : 85}%** مع ${topMatches.length > 0 ? `وظائف مثل (${jobTitlesStr})` : "المجالات المهنية التي حددتها"}.
-• ننصحك بتحديث ملفك الشخصي لإضافة كلمات دلالية إضافية مثل **(${profile.skills.slice(0, 2).join("، ")})** لرفع احتمالية عبور سيرتك الذاتية من فلاتر الـ ATS لدى الشركات السعودية والمصرية بنسبة ٢٥٪.
-• قمنا بتفعيل التنبيه اليومي التلقائي لك وسيصلك إشعار فوري عند إدراج أي شاغر جديد يطابق تطلعاتك المالية والجغرافية.`;
-  }
-
-  return {
-    success: true,
-    matches: matchedList,
-    dailyReport
-  };
+  return { success: true, jobs: scored.slice(0, 20) };
 }
